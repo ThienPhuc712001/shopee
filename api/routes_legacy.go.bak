@@ -1,0 +1,92 @@
+package routes
+
+import (
+	"ecommerce/internal/handler"
+	"ecommerce/pkg/middleware"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// SetupRouter configures all routes for the application
+func SetupRouter(
+	authHandler *handler.AuthHandler,
+	productHandler *handler.ProductHandler,
+	cartHandler *handler.CartHandler,
+	orderHandler *handler.OrderHandler,
+	jwtSecret string,
+	allowedOrigins []string,
+) *gin.Engine {
+	router := gin.New()
+
+	// Global middleware
+	router.Use(middleware.Recovery())
+	router.Use(middleware.RequestLogger())
+	router.Use(middleware.CORS(allowedOrigins))
+
+	// Health check
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+		})
+	})
+
+	// API routes
+	api := router.Group("/api")
+	{
+		// Public routes
+		setupAuthRoutes(api.Group("/auth"), authHandler)
+		setupPublicProductRoutes(api.Group("/products"), productHandler)
+
+		// Protected routes
+		protected := api.Group("")
+		protected.Use(middleware.JWTMiddleware(jwtSecret))
+		{
+			setupProtectedProductRoutes(protected.Group("/products"), productHandler)
+			setupCartRoutes(protected.Group("/cart"), cartHandler)
+			setupOrderRoutes(protected.Group("/orders"), orderHandler)
+		}
+	}
+
+	return router
+}
+
+// setupAuthRoutes configures authentication routes
+func setupAuthRoutes(rg *gin.RouterGroup, handler *handler.AuthHandler) {
+	rg.POST("/register", handler.Register)
+	rg.POST("/login", handler.Login)
+	rg.GET("/me", handler.Me)
+}
+
+// setupPublicProductRoutes configures public product routes
+func setupPublicProductRoutes(rg *gin.RouterGroup, handler *handler.ProductHandler) {
+	rg.GET("", handler.GetAllProducts)
+	rg.GET("/search", handler.SearchProducts)
+	rg.GET("/best-sellers", handler.GetBestSellers)
+	rg.GET("/:id", handler.GetProduct)
+}
+
+// setupProtectedProductRoutes configures protected product routes
+func setupProtectedProductRoutes(rg *gin.RouterGroup, handler *handler.ProductHandler) {
+	rg.POST("", handler.CreateProduct)
+	rg.PUT("/:id", handler.UpdateProduct)
+	rg.DELETE("/:id", handler.DeleteProduct)
+}
+
+// setupCartRoutes configures cart routes
+func setupCartRoutes(rg *gin.RouterGroup, handler *handler.CartHandler) {
+	rg.GET("", handler.GetCart)
+	rg.POST("/add", handler.AddToCart)
+	rg.PUT("/items/:id", handler.UpdateCartItem)
+	rg.DELETE("/items/:id", handler.RemoveFromCart)
+	rg.DELETE("/clear", handler.ClearCart)
+}
+
+// setupOrderRoutes configures order routes
+func setupOrderRoutes(rg *gin.RouterGroup, handler *handler.OrderHandler) {
+	rg.POST("", handler.CreateOrder)
+	rg.GET("", handler.GetUserOrders)
+	rg.GET("/:id", handler.GetOrder)
+	rg.PUT("/:id/status", handler.UpdateOrderStatus)
+	rg.POST("/:id/cancel", handler.CancelOrder)
+}
