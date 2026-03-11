@@ -1,0 +1,1 @@
+[31mERRO[0m[2026-03-11 14:07:37] Failed to create user                         [31merror[0m="mssql: Violation of UNIQUE KEY constraint 'UQ__users__B43B145FBA6AEA90'. Cannot insert duplicate key in object 'dbo.users'. The duplicate key value is (0919959368)."

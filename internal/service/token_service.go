@@ -3,6 +3,7 @@ package service
 import (
 	"ecommerce/internal/domain/model"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -71,6 +72,9 @@ type TokenService interface {
 
 	// GetTokenExpiry returns the expiry time of a token
 	GetTokenExpiry(tokenString string) (time.Time, error)
+
+	// GetRefreshExpiry returns the refresh token expiry duration
+	GetRefreshExpiry() time.Duration
 }
 
 type tokenService struct {
@@ -146,7 +150,7 @@ func (s *tokenService) GenerateAccessToken(user *model.User) (string, time.Time,
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
 			Issuer:    s.issuer,
-			Subject:   string(rune(user.ID)),
+			Subject:   fmt.Sprintf("%d", user.ID),
 		},
 	}
 
@@ -287,6 +291,11 @@ func (s *tokenService) GetTokenExpiry(tokenString string) (time.Time, error) {
 	}
 
 	return claims.ExpiresAt.Time, nil
+}
+
+// GetRefreshExpiry returns the refresh token expiry duration
+func (s *tokenService) GetRefreshExpiry() time.Duration {
+	return s.refreshExpiry
 }
 
 // TokenBlacklist defines interface for token blacklist

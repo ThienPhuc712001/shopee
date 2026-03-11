@@ -1,13 +1,16 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"ecommerce/internal/domain/model"
 	"ecommerce/internal/errors"
 	"ecommerce/pkg/jwt"
 	"ecommerce/pkg/logger"
+
+	"github.com/gin-gonic/gin"
 )
 
 // JWTAuthConfig holds JWT authentication configuration
@@ -141,6 +144,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole, exists := c.Get("user_role")
 		if !exists {
+			fmt.Printf("DEBUG RequireRole: user_role NOT FOUND in context\n")
 			c.AbortWithStatusJSON(http.StatusForbidden, errors.
 				Forbidden("Role not found").
 				WithPath(c.Request.URL.Path).
@@ -148,14 +152,19 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 			return
 		}
 
-		roleStr, ok := userRole.(string)
-		if !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, errors.
-				Forbidden("Invalid role format").
-				WithPath(c.Request.URL.Path).
-				ToResponse())
-			return
+		// Convert role to string - handle model.UserRole type specifically
+		var roleStr string
+		switch v := userRole.(type) {
+		case model.UserRole:
+			roleStr = string(v)
+		case string:
+			roleStr = v
+		default:
+			roleStr = fmt.Sprintf("%v", v)
 		}
+
+		fmt.Printf("DEBUG RequireRole: path=%s, user_role=%v, type=%T, roleStr='%s', allowed=%v\n", 
+			c.Request.URL.Path, userRole, userRole, roleStr, roles)
 
 		// Check if user role is in allowed roles
 		allowed := false
@@ -167,6 +176,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 		}
 
 		if !allowed {
+			fmt.Printf("DEBUG RequireRole: ACCESS DENIED - role '%s' not in allowed list\n", roleStr)
 			c.AbortWithStatusJSON(http.StatusForbidden, errors.
 				Forbidden("Insufficient permissions").
 				WithPath(c.Request.URL.Path).
@@ -174,6 +184,7 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 			return
 		}
 
+		fmt.Printf("DEBUG RequireRole: ACCESS GRANTED\n")
 		c.Next()
 	}
 }

@@ -15,34 +15,38 @@ func SetupProductRoutes(
 	productHandler *handler.ProductHandlerEnhanced,
 	tokenService service.TokenService,
 ) {
-	// Public routes (no auth required)
-	public := rg.Group("")
+	// Create products group
+	products := rg.Group("/products")
 	{
-		public.GET("", productHandler.GetProducts)
-		public.GET("/search", productHandler.SearchProducts)
-		public.GET("/featured", productHandler.GetFeaturedProducts)
-		public.GET("/best-sellers", productHandler.GetBestSellers)
-		public.GET("/:id", productHandler.GetProduct)
-		public.GET("/category/:id", productHandler.GetProductsByCategory)
-		public.GET("/:id/variants", productHandler.GetVariants)
-	}
-
-	// Protected routes (auth required)
-	protected := rg.Group("")
-	protected.Use(middleware.JWTAuth(tokenService))
-	{
-		// Seller routes
-		seller := protected.Group("")
-		seller.Use(middleware.RequireSeller())
+		// Public routes (no auth required)
+		public := products.Group("")
 		{
-			seller.POST("", productHandler.CreateProduct)
-			seller.PUT("/:id", productHandler.UpdateProduct)
-			seller.DELETE("/:id", productHandler.DeleteProduct)
-			seller.POST("/:id/images", productHandler.UploadProductImages)
-			seller.POST("/:id/variants", productHandler.CreateVariant)
-			seller.PUT("/:id/stock", productHandler.UpdateStock)
-			seller.PATCH("/:id/publish", productHandler.PublishProduct)
-			seller.PATCH("/:id/unpublish", productHandler.UnpublishProduct)
+			public.GET("", productHandler.GetProducts)
+			public.GET("/search", productHandler.SearchProducts)
+			public.GET("/featured", productHandler.GetFeaturedProducts)
+			public.GET("/best-sellers", productHandler.GetBestSellers)
+			public.GET("/:id", productHandler.GetProduct)
+			public.GET("/category/:id", productHandler.GetProductsByCategory)
+			public.GET("/:id/variants", productHandler.GetVariants)
+		}
+
+		// Protected routes (auth required)
+		protected := products.Group("")
+		protected.Use(middleware.JWTAuth(tokenService))
+		{
+			// Seller or Admin routes
+			seller := protected.Group("")
+			seller.Use(middleware.RequireSellerOrAdmin())
+			{
+				seller.POST("", productHandler.CreateProduct)
+				seller.PUT("/:id", productHandler.UpdateProduct)
+				seller.DELETE("/:id", productHandler.DeleteProduct)
+				seller.POST("/:id/images", productHandler.UploadProductImages)
+				seller.POST("/:id/variants", productHandler.CreateVariant)
+				seller.PUT("/:id/stock", productHandler.UpdateStock)
+				seller.PATCH("/:id/publish", productHandler.PublishProduct)
+				seller.PATCH("/:id/unpublish", productHandler.UnpublishProduct)
+			}
 		}
 	}
 }
@@ -102,50 +106,24 @@ func SetupEnhancedRouter(
 		// Authentication routes
 		SetupAuthRoutes(api.Group("/auth"), authHandler, tokenService)
 
-		// Public product routes (no auth required)
-		setupPublicProductRoutes(api.Group("/products"), productHandler)
+		// Note: Product routes are setup separately via SetupProductRoutes in main.go
+		// to avoid duplicate route registration
 
 		// Protected routes
 		protected := api.Group("")
 		protected.Use(middleware.JWTAuth(tokenService))
 		{
-			// Product routes (auth required)
-			setupProtectedProductRoutes(protected.Group("/products"), productHandler, tokenService)
-
 			// Cart routes
 			setupCartRoutes(protected.Group("/cart"), cartHandler)
 
 			// Order routes
 			setupOrderRoutes(protected.Group("/orders"), orderHandler)
 
-			// Admin routes
-			setupAdminRoutes(protected.Group("/admin"), tokenService)
+			// Admin routes will be setup in main.go using SetupAdminRoutes
 		}
 	}
 
 	return router
-}
-
-// setupPublicProductRoutes configures public product routes
-func setupPublicProductRoutes(rg *gin.RouterGroup, handler *handler.ProductHandlerEnhanced) {
-	rg.GET("", handler.GetProducts)
-	rg.GET("/search", handler.SearchProducts)
-	rg.GET("/best-sellers", handler.GetBestSellers)
-	rg.GET("/:id", handler.GetProduct)
-}
-
-// setupProtectedProductRoutes configures protected product routes with RBAC
-func setupProtectedProductRoutes(rg *gin.RouterGroup, handler *handler.ProductHandlerEnhanced, tokenService service.TokenService) {
-	// Sellers can create products
-	sellerOnly := rg.Group("")
-	sellerOnly.Use(middleware.RequireSeller())
-	{
-		sellerOnly.POST("", handler.CreateProduct)
-	}
-
-	// Product owners can update/delete their products
-	rg.PUT("/:id", handler.UpdateProduct)
-	rg.DELETE("/:id", handler.DeleteProduct)
 }
 
 // setupCartRoutes configures cart routes
@@ -169,32 +147,6 @@ func setupOrderRoutes(rg *gin.RouterGroup, handler *handler.OrderHandlerEnhanced
 	sellerAdmin.Use(middleware.RequireSellerOrAdmin())
 	{
 		sellerAdmin.PUT("/:id/status", handler.UpdateOrderStatus)
-	}
-}
-
-// setupAdminRoutes configures admin-only routes
-func setupAdminRoutes(rg *gin.RouterGroup, tokenService service.TokenService) {
-	adminOnly := rg.Group("")
-	adminOnly.Use(middleware.RequireAdmin())
-	{
-		// Admin-only endpoints go here
-		rg.GET("/users", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Admin users list endpoint",
-			})
-		})
-
-		rg.GET("/shops", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Admin shops list endpoint",
-			})
-		})
-
-		rg.GET("/orders/all", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Admin all orders endpoint",
-			})
-		})
 	}
 }
 

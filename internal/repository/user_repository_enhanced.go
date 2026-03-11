@@ -13,6 +13,7 @@ type UserRepositoryEnhanced interface {
 	Delete(id uint) error
 	FindByID(id uint) (*model.User, error)
 	FindByEmail(email string) (*model.User, error)
+	FindByPhone(phone string) (*model.User, error)
 
 	// Queries
 	FindAll(limit, offset int) ([]model.User, int64, error)
@@ -57,6 +58,15 @@ func (r *userRepositoryEnhanced) FindByID(id uint) (*model.User, error) {
 func (r *userRepositoryEnhanced) FindByEmail(email string) (*model.User, error) {
 	var user model.User
 	err := r.db.Where("email = ?", email).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *userRepositoryEnhanced) FindByPhone(phone string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("phone = ?", phone).First(&user).Error
 	if err != nil {
 		return nil, err
 	}

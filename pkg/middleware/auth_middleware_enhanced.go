@@ -101,6 +101,16 @@ func RequireRole(roles ...model.UserRole) gin.HandlerFunc {
 
 		userRole, ok := userRoleValue.(model.UserRole)
 		if !ok {
+			// Try to handle if role is stored as string
+			if roleStr, ok := userRoleValue.(string); ok {
+				// Convert string to model.UserRole for comparison
+				for _, allowedRole := range roles {
+					if roleStr == string(allowedRole) {
+						c.Next()
+						return
+					}
+				}
+			}
 			c.JSON(http.StatusForbidden, response.Forbidden("Invalid role format"))
 			c.Abort()
 			return

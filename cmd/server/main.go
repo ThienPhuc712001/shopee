@@ -57,12 +57,13 @@ func main() {
 	productRepo := repository.NewProductRepositoryEnhanced(db)
 	cartRepo := repository.NewCartRepositoryEnhanced(db)
 	orderRepo := repository.NewOrderRepositoryEnhanced(db)
-	_ = repository.NewShopRepositoryEnhanced(db)
+	shopRepo := repository.NewShopRepositoryEnhanced(db)
 	paymentRepo := repository.NewPaymentRepositoryEnhanced(db)
 	imageRepo := repository.NewImageRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
 	inventoryRepo := repository.NewInventoryRepository(db)
 	couponRepo := repository.NewCouponRepository(db)
+	adminRepo := repository.NewAdminRepositoryEnhanced(db)
 
 	// Initialize token service with separate secrets for access and refresh tokens
 	tokenService := service.NewTokenService(service.TokenServiceConfig{
@@ -113,7 +114,15 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authService, appLog)
+	
+	// Initialize shop service and handler first (needed by product handler)
+	shopService := service.NewShopService(shopRepo)
+	shopHandler := handler.NewShopHandler(shopService)
+	
+	// Initialize product handler with shop service
 	productHandler := handler.NewProductHandlerEnhanced(productService)
+	productHandler.SetShopService(shopService) // Set shop service for product handler
+	
 	cartHandler := handler.NewCartHandlerEnhanced(cartService)
 	orderHandler := handler.NewOrderHandlerEnhanced(orderService)
 	uploadHandler := handler.NewUploadHandler(uploadService)
@@ -123,6 +132,10 @@ func main() {
 	shippingHandler := handler.NewShippingHandler(shippingService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	_ = handler.NewPaymentHandlerEnhanced(paymentService)
+	
+	// Initialize admin service and handler
+	adminService := service.NewAdminServiceEnhanced(adminRepo, userRepo, shopRepo, productRepo, orderRepo)
+	adminHandler := handler.NewAdminHandlerEnhanced(adminService)
 
 	// Setup router with enhanced authentication
 	router := routes.SetupEnhancedRouter(
@@ -141,6 +154,9 @@ func main() {
 	// Setup category routes
 	routes.SetupCategoryRoutes(apiRoutes, categoryHandler, tokenService)
 
+	// Setup shop routes
+	routes.SetupShopRoutes(apiRoutes, shopHandler, tokenService)
+
 	// Setup product routes (search is included)
 	routes.SetupProductRoutes(apiRoutes, productHandler, tokenService)
 
@@ -155,6 +171,9 @@ func main() {
 
 	// Setup notification routes
 	routes.SetupNotificationRoutes(apiRoutes, notificationHandler, tokenService)
+
+	// Setup admin routes
+	routes.SetupAdminRoutes(apiRoutes.Group("/admin"), adminHandler, tokenService)
 
 	// Setup static file serving for uploaded images
 	routes.SetupStaticRoutes(router, "./uploads")

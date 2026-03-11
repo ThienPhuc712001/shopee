@@ -1,13 +1,14 @@
 package middleware
 
 import (
+	"ecommerce/internal/errors"
+	"ecommerce/pkg/logger"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ecommerce/internal/errors"
-	"ecommerce/pkg/logger"
 )
 
 // ============================================================================
@@ -184,10 +185,10 @@ func RateLimitMiddleware(limiter *RateLimiter, log *logger.Logger) gin.HandlerFu
 			}
 
 			// Return 429 Too Many Requests
-			c.Header("X-RateLimit-Limit", string(rune(limiter.limit)))
+			c.Header("X-RateLimit-Limit", strconv.Itoa(limiter.limit))
 			c.Header("X-RateLimit-Remaining", "0")
-			c.Header("X-RateLimit-Reset", string(rune(resetTime.Unix())))
-			c.Header("Retry-After", string(rune(resetTime.Unix()-time.Now().Unix())))
+			c.Header("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+			c.Header("Retry-After", strconv.FormatInt(resetTime.Unix()-time.Now().Unix(), 10))
 
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, errors.
 				TooManyRequests(int(resetTime.Unix() - time.Now().Unix())).
@@ -200,9 +201,9 @@ func RateLimitMiddleware(limiter *RateLimiter, log *logger.Logger) gin.HandlerFu
 		remaining := limiter.GetRemaining(clientIP)
 		resetTime := limiter.GetResetTime(clientIP)
 
-		c.Header("X-RateLimit-Limit", string(rune(limiter.limit)))
-		c.Header("X-RateLimit-Remaining", string(rune(remaining)))
-		c.Header("X-RateLimit-Reset", string(rune(resetTime.Unix())))
+		c.Header("X-RateLimit-Limit", strconv.Itoa(limiter.limit))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		c.Header("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
 
 		c.Next()
 	}
@@ -282,7 +283,7 @@ func EndpointRateLimitMiddleware(erl *EndpointRateLimiter, log *logger.Logger) g
 					}).Warn("Endpoint rate limit exceeded")
 				}
 
-				c.Header("Retry-After", string(rune(resetTime.Unix()-time.Now().Unix())))
+				c.Header("Retry-After", strconv.FormatInt(resetTime.Unix()-time.Now().Unix(), 10))
 				c.AbortWithStatusJSON(http.StatusTooManyRequests, errors.
 					TooManyRequests(int(resetTime.Unix() - time.Now().Unix())).
 					WithPath(path).

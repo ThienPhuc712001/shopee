@@ -427,9 +427,9 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	var req struct {
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Phone     string `json:"phone"`
+		FirstName string `json:"first_name" binding:"required"`
+		LastName  string `json:"last_name" binding:"required"`
+		Phone     string `json:"phone" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -437,14 +437,29 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement profile update in service
+	// Update user profile
+	user, err := h.authService.GetUserByID(uint(userID))
+	if err != nil {
+		middleware.AbortWithError(c, errors.Internal("Failed to update profile"))
+		return
+	}
+
+	user.FirstName = req.FirstName
+	user.LastName = req.LastName
+	user.Phone = req.Phone
+
+	if err := h.authService.UpdateUser(user); err != nil {
+		middleware.AbortWithError(c, errors.Internal("Failed to update profile"))
+		return
+	}
+
 	h.log.WithFields(logger.Fields{
 		"user_id": userID,
-	}).Info("Profile update requested")
+	}).Info("Profile updated successfully")
 
 	middleware.Success(c, gin.H{
-		"message": "Profile updated successfully",
-	}, "")
+		"user": user,
+	}, "Profile updated successfully")
 }
 
 // RequestPasswordReset initiates password reset
@@ -454,7 +469,18 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 
 // VerifyEmail verifies user email
 func (h *AuthHandler) VerifyEmail(c *gin.Context) {
-	// TODO: Implement email verification
+	token := c.Query("token")
+	if token == "" {
+		middleware.AbortWithError(c, errors.BadRequest("Verification token is required"))
+		return
+	}
+
+	if err := h.authService.VerifyEmail(token); err != nil {
+		middleware.AbortWithError(c, errors.BadRequest("Invalid or expired verification token"))
+		return
+	}
+
+	h.log.Info("Email verified successfully")
 	middleware.Success(c, nil, "Email verified successfully")
 }
 
@@ -469,9 +495,12 @@ func (h *AuthHandler) ResendVerificationEmail(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement resend verification
-	h.log.WithField("email", req.Email).Info("Verification email resend requested")
+	if err := h.authService.ResendVerificationEmail(req.Email); err != nil {
+		middleware.AbortWithError(c, errors.Internal("Failed to resend verification email"))
+		return
+	}
 
+	h.log.WithField("email", req.Email).Info("Verification email resent successfully")
 	middleware.Success(c, nil, "Verification email sent")
 }
 

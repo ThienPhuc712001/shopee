@@ -114,15 +114,16 @@ type Product struct {
 	FlashSaleEnd      *time.Time    `gorm:"type:datetime" json:"flash_sale_end"`
 
 	// Physical Properties
-	Weight            float64       `gorm:"type:decimal(10,2)" json:"weight"` // in grams
-	Dimensions        string        `gorm:"type:varchar(50)" json:"dimensions"` // LxWxH
-	WarrantyPeriod    string        `gorm:"type:varchar(50)" json:"warranty_period"`
-	ReturnDays        int           `gorm:"type:int;default:7" json:"return_days"`
+	// Weight            float64       `gorm:"type:decimal(10,2)" json:"weight"` // in grams - NOT IN DB
+	// Dimensions        string        `gorm:"type:varchar(50)" json:"dimensions"` // LxWxH - NOT IN DB
+	// WarrantyPeriod    string        `gorm:"type:varchar(50)" json:"warranty_period"` - NOT IN DB
+	// ReturnDays        int           `gorm:"type:int;default:7" json:"return_days"` // Commented out due to migration issue
 
 	// SEO
-	Tags              string        `gorm:"type:text" json:"tags"` // JSON array
+	// Tags              string        `gorm:"type:text" json:"tags"` // JSON array - Commented out due to migration issue
 	MetaTitle         string        `gorm:"type:varchar(255)" json:"meta_title"`
 	MetaDescription   string        `gorm:"type:varchar(500)" json:"meta_description"`
+	// MetaKeywords      string        `gorm:"type:varchar(500)" json:"meta_keywords"` - NOT IN DB
 
 	// Relationships
 	Images     []ProductImage     `gorm:"foreignKey:ProductID" json:"images,omitempty"`

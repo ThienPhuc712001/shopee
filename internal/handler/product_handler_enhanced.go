@@ -5,6 +5,8 @@ import (
 	"ecommerce/internal/service"
 	"ecommerce/pkg/pagination"
 	"ecommerce/pkg/response"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +17,7 @@ import (
 // ProductHandlerEnhanced handles product requests
 type ProductHandlerEnhanced struct {
 	productService service.ProductServiceEnhanced
+	shopService    service.ShopService
 }
 
 // NewProductHandlerEnhanced creates a new enhanced product handler
@@ -22,6 +25,11 @@ func NewProductHandlerEnhanced(productService service.ProductServiceEnhanced) *P
 	return &ProductHandlerEnhanced{
 		productService: productService,
 	}
+}
+
+// SetShopService sets the shop service (to avoid circular dependency)
+func (h *ProductHandlerEnhanced) SetShopService(shopService service.ShopService) {
+	h.shopService = shopService
 }
 
 // ==================== REQUEST/RESPONSE STRUCTS ====================
@@ -103,13 +111,61 @@ type ProductFiltersRequest struct {
 // @Success 201 {object} response.Response
 // @Router /api/products [post]
 func (h *ProductHandlerEnhanced) CreateProduct(c *gin.Context) {
-	// Get shop ID from context (set by auth middleware)
-	shopIDValue, exists := c.Get("shop_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, response.Unauthorized("Shop ID not found"))
+	// Get user ID and role from context
+	userIDValue, userIDExists := c.Get("user_id")
+	userRoleValue, roleExists := c.Get("user_role")
+
+	if !userIDExists || !roleExists {
+		c.JSON(http.StatusUnauthorized, response.Unauthorized("Authentication required"))
 		return
 	}
-	shopID := shopIDValue.(uint)
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusBadRequest, response.BadRequest("Invalid user ID"))
+		return
+	}
+
+	// Handle both model.UserRole and string types
+	var roleStr string
+	switch v := userRoleValue.(type) {
+	case model.UserRole:
+		roleStr = string(v)
+	case string:
+		roleStr = v
+	default:
+		roleStr = fmt.Sprintf("%v", v)
+	}
+
+	// Get shop ID - try from context first (set by middleware if available)
+	shopIDValue, shopExists := c.Get("shop_id")
+	var shopID uint
+	if shopExists {
+		shopID = shopIDValue.(uint)
+	} else {
+		// Shop not in context - fetch from database
+		// This is needed because middleware doesn't automatically fetch shop
+		var shop *model.Shop
+		var err error
+		if h.shopService != nil {
+			shop, err = h.shopService.GetShopByUserID(userID)
+		} else {
+			// Fallback: shop service not set
+			shop = nil
+			err = errors.New("shop service not available")
+		}
+		if err != nil || shop == nil {
+			// No shop found
+			if roleStr != "admin" && roleStr != "super_admin" {
+				c.JSON(http.StatusForbidden, response.Forbidden("Seller account required"))
+				return
+			}
+			// Admin without shop
+			c.JSON(http.StatusBadRequest, response.BadRequest("Admin must have a shop to create products. Please create a shop first."))
+			return
+		}
+		shopID = shop.ID
+	}
 
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -127,11 +183,8 @@ func (h *ProductHandlerEnhanced) CreateProduct(c *gin.Context) {
 		Stock:            req.Stock,
 		CategoryID:       req.CategoryID,
 		Brand:            req.Brand,
-		Weight:           req.Weight,
-		Dimensions:       req.Dimensions,
-		WarrantyPeriod:   req.WarrantyPeriod,
-		ReturnDays:       req.ReturnDays,
 		Status:           model.ProductStatusDraft,
+		ShopID:           shopID,
 	}
 
 	// Create product

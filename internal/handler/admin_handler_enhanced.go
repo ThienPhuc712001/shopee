@@ -143,6 +143,56 @@ func (h *AdminHandlerEnhanced) ApproveSeller(c *gin.Context) {
 	}, "Seller approved successfully"))
 }
 
+// GetPendingSellers handles getting pending sellers
+// @Summary Get pending sellers
+// @Description Get list of pending seller applications (Admin only)
+// @Tags admin/sellers
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number"
+// @Param limit query int false "Items per page"
+// @Success 200 {object} response.PaginatedResponse
+// @Router /api/admin/sellers/pending [get]
+func (h *AdminHandlerEnhanced) GetPendingSellers(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	shops, total, err := h.adminService.GetPendingSellers(page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get pending sellers"))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Paginated(gin.H{
+		"shops": shops,
+	}, total, page, limit, ""))
+}
+
+// GetProductsForModeration handles getting products for moderation
+// @Summary Get products for moderation
+// @Description Get list of products pending moderation (Admin only)
+// @Tags admin/products
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number"
+// @Param limit query int false "Items per page"
+// @Success 200 {object} response.PaginatedResponse
+// @Router /api/admin/products [get]
+func (h *AdminHandlerEnhanced) GetProductsForModeration(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	products, total, err := h.adminService.GetProductsForModeration(page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get products for moderation"))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Paginated(gin.H{
+		"products": products,
+	}, total, page, limit, ""))
+}
+
 // DeleteProduct handles deleting a product
 // @Summary Delete product
 // @Description Delete a product (Admin only)

@@ -173,9 +173,10 @@ func (s *productServiceEnhanced) UpdateProduct(id uint, product *model.Product, 
 	if product.Brand != "" {
 		existingProduct.Brand = product.Brand
 	}
-	if product.Weight > 0 {
-		existingProduct.Weight = product.Weight
-	}
+	// Weight field commented out - not in database
+	// if product.Weight > 0 {
+	// 	existingProduct.Weight = product.Weight
+	// }
 
 	// Save changes
 	if err := s.productRepo.Update(existingProduct); err != nil {

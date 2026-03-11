@@ -23,33 +23,38 @@ func SetupAdminRoutes(
 	protected := rg.Group("")
 	protected.Use(middleware.JWTAuth(tokenService))
 	{
-		// User Management
-		protected.GET("/users", adminHandler.GetUsers)
-		protected.POST("/users/ban", adminHandler.BanUser)
+		// Admin-only middleware
+		adminOnly := protected.Group("")
+		adminOnly.Use(middleware.RequireAdmin())
+		{
+			// User Management
+			adminOnly.GET("/users", adminHandler.GetUsers)
+			adminOnly.POST("/users/ban", adminHandler.BanUser)
 
-		// Seller Management
-		protected.GET("/sellers/pending", adminHandler.GetUsers) // Simplified
-		protected.POST("/sellers/approve", adminHandler.ApproveSeller)
+			// Seller Management
+			adminOnly.GET("/sellers/pending", adminHandler.GetPendingSellers)
+			adminOnly.POST("/sellers/approve", adminHandler.ApproveSeller)
 
-		// Product Management
-		protected.GET("/products", adminHandler.GetUsers) // Simplified
-		protected.DELETE("/products/:id", adminHandler.DeleteProduct)
+			// Product Management
+			adminOnly.GET("/products", adminHandler.GetProductsForModeration)
+			adminOnly.DELETE("/products/:id", adminHandler.DeleteProduct)
 
-		// Order Management
-		protected.GET("/orders", adminHandler.GetOrders)
-		protected.POST("/orders/refund", adminHandler.RefundOrder)
+			// Order Management
+			adminOnly.GET("/orders", adminHandler.GetOrders)
+			adminOnly.POST("/orders/refund", adminHandler.RefundOrder)
 
-		// Analytics
-		protected.GET("/analytics/stats", adminHandler.GetAdminStats)
-		protected.GET("/analytics/sales", adminHandler.GetSalesAnalytics)
-		protected.GET("/analytics/users", adminHandler.GetUserAnalytics)
-		protected.GET("/analytics/products", adminHandler.GetProductAnalytics)
+			// Analytics
+			adminOnly.GET("/analytics/stats", adminHandler.GetAdminStats)
+			adminOnly.GET("/analytics/sales", adminHandler.GetSalesAnalytics)
+			adminOnly.GET("/analytics/users", adminHandler.GetUserAnalytics)
+			adminOnly.GET("/analytics/products", adminHandler.GetProductAnalytics)
 
-		// Audit Logs
-		protected.GET("/audit-logs", adminHandler.GetAuditLogs)
+			// Audit Logs
+			adminOnly.GET("/audit-logs", adminHandler.GetAuditLogs)
 
-		// System Settings
-		protected.GET("/settings/:key", adminHandler.GetSystemSetting)
-		protected.PUT("/settings/:key", adminHandler.UpdateSystemSetting)
+			// System Settings
+			adminOnly.GET("/settings/:key", adminHandler.GetSystemSetting)
+			adminOnly.PUT("/settings/:key", adminHandler.UpdateSystemSetting)
+		}
 	}
 }

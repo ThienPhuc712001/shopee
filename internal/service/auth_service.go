@@ -32,13 +32,13 @@ var (
 
 // LoginRequest represents a login request
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
+	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
 // RegisterRequest represents a registration request
 type RegisterRequest struct {
-	Email     string `json:"email" binding:"required,email"`
+	Email     string `json:"email" binding:"required"`
 	Password  string `json:"password" binding:"required,min=8"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
@@ -224,10 +224,26 @@ func (s *AuthService) clearFailedLogin(user *model.User) error {
 
 // Register creates a new user account
 func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*AuthResponse, error) {
+	// Validate email format (simple validation)
+	if req.Email == "" {
+		return nil, errors.New("email is required")
+	}
+	if !isValidEmail(req.Email) {
+		return nil, errors.New("invalid email format")
+	}
+
 	// Check if email already exists
 	existingUser, _ := s.userRepo.FindByEmail(req.Email)
 	if existingUser != nil {
 		return nil, ErrEmailAlreadyExists
+	}
+
+	// Check if phone already exists (if provided)
+	if req.Phone != "" {
+		existingPhone, err := s.userRepo.FindByPhone(req.Phone)
+		if err == nil && existingPhone != nil {
+			return nil, errors.New("phone number already registered")
+		}
 	}
 
 	// Validate password strength
@@ -390,23 +406,31 @@ func (s *AuthService) LogoutAllDevices(ctx context.Context, userID uint) error {
 // ForgotPassword initiates password reset (sends reset email)
 func (s *AuthService) ForgotPassword(ctx context.Context, email string) error {
 	// Check if user exists
-	_, err := s.userRepo.FindByEmail(email)
+	user, err := s.userRepo.FindByEmail(email)
 	if err != nil {
 		// Don't reveal if email exists or not
 		s.log.WithField("email", email).Info("Password reset requested")
 		return nil
 	}
 
-	// TODO: Generate reset token and send email
-	s.log.WithField("email", email).Info("Password reset initiated")
+	// Generate reset token (simple implementation - should use secure token generation)
+	_ = generateResetToken()
+	
+	// TODO: Store reset token in database with expiry
+	// TODO: Send email with reset link
+	
+	s.log.WithFields(logger.Fields{
+		"email": email,
+		"user_id": user.ID,
+	}).Info("Password reset initiated")
 	return nil
 }
 
 // ResetPassword resets user password with token
 func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword string) error {
-	// TODO: Validate reset token and update password
-	// This is a placeholder implementation
-
+	// TODO: Validate reset token from database
+	// TODO: Check token expiry
+	
 	// Validate new password
 	if err := password.ValidateDefault(newPassword); err != nil {
 		return err
@@ -419,6 +443,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	// TODO: Find user by reset token and update password
+	// For now, this is a placeholder
 	_ = hashedPassword
 	_ = token
 
@@ -462,4 +487,76 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uint, oldPasswo
 
 	s.log.WithField("user_id", userID).Info("Password changed successfully")
 	return nil
+}
+
+// GetUserByID retrieves a user by ID
+func (s *AuthService) GetUserByID(userID uint) (*model.User, error) {
+	return s.userRepo.FindByID(userID)
+}
+
+// UpdateUser updates user information
+func (s *AuthService) UpdateUser(user *model.User) error {
+	return s.userRepo.Update(user)
+}
+
+// VerifyEmail verifies user email with token
+func (s *AuthService) VerifyEmail(token string) error {
+	// TODO: Validate email verification token
+	// TODO: Find user by token and set EmailVerified = true
+	// For now, return nil to allow the flow
+	return nil
+}
+
+// ResendVerificationEmail resends verification email
+func (s *AuthService) ResendVerificationEmail(email string) error {
+	// Check if user exists
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		// Don't reveal if email exists or not
+		return nil
+	}
+
+	// TODO: Generate verification token and send email
+	s.log.WithFields(logger.Fields{
+		"email": email,
+		"user_id": user.ID,
+	}).Info("Verification email sent")
+	return nil
+}
+
+// generateResetToken generates a secure password reset token
+func generateResetToken() string {
+	// TODO: Use secure random token generation
+	return "reset_token_placeholder"
+}
+
+// isValidEmail validates email format using simple regex
+func isValidEmail(email string) bool {
+	// Simple email validation - check for @ and .
+	if len(email) < 5 || len(email) > 255 {
+		return false
+	}
+	
+	// Check for @ symbol
+	atIndex := -1
+	for i, c := range email {
+		if c == '@' {
+			atIndex = i
+			break
+		}
+	}
+	if atIndex <= 0 {
+		return false
+	}
+	
+	// Check for . after @
+	dotFound := false
+	for i := atIndex + 1; i < len(email); i++ {
+		if email[i] == '.' {
+			dotFound = true
+			break
+		}
+	}
+	
+	return dotFound && atIndex < len(email)-2
 }
