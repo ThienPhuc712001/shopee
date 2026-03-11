@@ -1,0 +1,96 @@
+// Package main demonstrates how to initialize and use the error handling
+// and logging system in the main application
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/gin-gonic/gin"
+	"ecommerce/internal/handler"
+	"ecommerce/internal/middleware"
+	"ecommerce/pkg/logger"
+)
+
+func main() {
+	// ========================================================================
+	// 1. INITIALIZE LOGGER
+	// ========================================================================
+
+	// Create logger configuration
+	logConfig := &logger.Config{
+		Level:         "debug", // debug, info, warn, error
+		Format:        "text",  // text or json
+		FilePath:      "logs/app.log",
+		ErrorFilePath: "logs/error.log",
+		Stdout:        true,
+		Color:         true,
+		Service:       "ecommerce-api",
+		Environment:   "development", // development, staging, production
+		MaxSize:       100,           // MB
+		MaxBackups:    30,            // files
+		MaxAge:        90,            // days
+		Compress:      true,
+	}
+
+	// Initialize logger
+	log, err := logger.New(logConfig)
+	if err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Set as global logger (optional)
+	logger.SetDefault(log)
+
+	log.Info("Application starting...")
+
+	// ========================================================================
+	// 2. SETUP GIN WITH MIDDLEWARE
+	// ========================================================================
+
+	// Create Gin router
+	r := gin.New()
+
+	// Setup middleware
+	middlewares := middleware.Setup(log, middleware.DefaultConfig())
+	r.Use(middlewares...)
+
+	// ========================================================================
+	// 3. REGISTER ROUTES
+	// ========================================================================
+
+	// API routes
+	api := r.Group("/api")
+	{
+		// Register example handlers
+		handler.RegisterRoutes(api, log)
+
+		// Example: Register your actual handlers here
+		// products := api.Group("/products")
+		// {
+		//     products.GET("", productHandler.List)
+		//     products.GET("/:id", productHandler.Get)
+		//     products.POST("", productHandler.Create)
+		//     products.PUT("/:id", productHandler.Update)
+		//     products.DELETE("/:id", productHandler.Delete)
+		// }
+	}
+
+	// Health check endpoint
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "healthy",
+		})
+	})
+
+	// ========================================================================
+	// 4. START SERVER
+	// ========================================================================
+
+	log.WithField("port", 8080).Info("Server starting")
+
+	if err := r.Run(":8080"); err != nil {
+		log.WithError(err).Fatal("Failed to start server")
+	}
+}

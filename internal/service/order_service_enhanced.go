@@ -3,6 +3,7 @@ package service
 import (
 	"ecommerce/internal/domain/model"
 	"ecommerce/internal/repository"
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -49,6 +50,9 @@ type orderServiceEnhanced struct {
 	orderRepo   repository.OrderRepositoryEnhanced
 	cartRepo    repository.CartRepositoryEnhanced
 	productRepo repository.ProductRepositoryEnhanced
+	couponRepo  *repository.CouponRepository
+	couponSvc   *CouponService
+	notifSvc    *NotificationService
 }
 
 // NewOrderServiceEnhanced creates a new enhanced order service
@@ -56,11 +60,17 @@ func NewOrderServiceEnhanced(
 	orderRepo repository.OrderRepositoryEnhanced,
 	cartRepo repository.CartRepositoryEnhanced,
 	productRepo repository.ProductRepositoryEnhanced,
+	couponRepo *repository.CouponRepository,
+	couponSvc *CouponService,
+	notifSvc *NotificationService,
 ) OrderServiceEnhanced {
 	return &orderServiceEnhanced{
 		orderRepo:   orderRepo,
 		cartRepo:    cartRepo,
 		productRepo: productRepo,
+		couponRepo:  couponRepo,
+		couponSvc:   couponSvc,
+		notifSvc:    notifSvc,
 	}
 }
 
@@ -118,6 +128,11 @@ func (s *orderServiceEnhanced) CheckoutCart(userID uint, input *model.OrderInput
 	// Lock inventory for all orders
 	if err := s.LockInventory(mainOrder.ID); err != nil {
 		return nil, ErrInventoryLockFailed
+	}
+
+	// Send order notification
+	if s.notifSvc != nil {
+		go s.notifSvc.SendOrderNotification(context.Background(), userID, mainOrder.OrderNumber, "created", mainOrder.TotalAmount)
 	}
 
 	return mainOrder, nil
@@ -180,8 +195,39 @@ func (s *orderServiceEnhanced) createSingleOrder(userID, shopID uint, cartItems 
 
 	shippingFee := s.CalculateShippingFee(&input.ShippingInfo, subtotal)
 	voucherDiscount := 0.0 // In production, validate and apply voucher
-	taxAmount := 0.0       // In production, calculate tax based on location
-	totalAmount := subtotal + shippingFee - voucherDiscount + taxAmount
+	
+	// Apply coupon discount if coupon code is provided
+	var couponID *uint
+	var couponCode string
+	couponDiscount := 0.0
+	
+	if input.CouponCode != "" {
+		// Get coupon
+		coupon, err := s.couponRepo.GetCouponByCode(context.Background(), input.CouponCode)
+		if err == nil {
+			// Validate coupon
+			applyInput := ApplyCouponInput{
+				Code:       input.CouponCode,
+				OrderTotal: subtotal,
+				UserID:     userID,
+			}
+			
+			result, err := s.couponSvc.ApplyCoupon(context.Background(), applyInput)
+			if err == nil && result.Success {
+				couponDiscount = result.DiscountAmount
+				couponID = &coupon.ID
+				couponCode = coupon.Code
+				
+				// For free shipping coupons, set shipping fee to 0
+				if coupon.DiscountType == model.DiscountTypeShipping {
+					shippingFee = 0
+				}
+			}
+		}
+	}
+	
+	taxAmount := 0.0 // In production, calculate tax based on location
+	totalAmount := subtotal + shippingFee - couponDiscount - voucherDiscount + taxAmount
 
 	// Create order
 	order := &model.Order{
@@ -190,6 +236,9 @@ func (s *orderServiceEnhanced) createSingleOrder(userID, shopID uint, cartItems 
 		Status:              model.OrderStatusPending,
 		PaymentStatus:       model.PaymentStatusPending,
 		FulfillmentStatus:   model.FulfillmentUnfulfilled,
+		CouponID:            couponID,
+		CouponCode:          couponCode,
+		CouponDiscount:      couponDiscount,
 		Subtotal:            subtotal,
 		ShippingFee:         shippingFee,
 		ShippingDiscount:    0,
@@ -394,6 +443,21 @@ func (s *orderServiceEnhanced) CompleteOrder(orderID uint) (*model.Order, error)
 	// Decrease inventory (permanent)
 	if err := s.DecreaseInventory(orderID); err != nil {
 		return nil, err
+	}
+
+	// Record coupon usage if coupon was applied
+	if order.CouponID != nil && order.CouponDiscount > 0 {
+		// Create coupon usage record
+		err := s.couponSvc.CreateCouponUsage(context.Background(), *order.CouponID, order.UserID, orderID, order.CouponDiscount)
+		if err != nil {
+			// Log error but don't fail the order completion
+			fmt.Printf("Warning: Failed to record coupon usage for order %d: %v\n", orderID, err)
+		}
+	}
+
+	// Send order delivered notification
+	if s.notifSvc != nil {
+		go s.notifSvc.SendOrderNotification(context.Background(), order.UserID, order.OrderNumber, "delivered", order.TotalAmount)
 	}
 
 	return s.orderRepo.GetOrderByID(orderID)

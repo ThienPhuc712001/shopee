@@ -47,12 +47,6 @@ func SetupProductRoutes(
 	}
 }
 
-// SetupCategoryRoutes configures category routes
-func SetupCategoryRoutes(rg *gin.RouterGroup, productHandler *handler.ProductHandlerEnhanced) {
-	rg.GET("", productHandler.GetCategories)
-	rg.GET("/:id", productHandler.GetCategoryByID)
-}
-
 // SetupAuthRoutes configures all authentication routes
 func SetupAuthRoutes(rg *gin.RouterGroup, authHandler *handler.AuthHandler, tokenService service.TokenService) {
 	// Public routes

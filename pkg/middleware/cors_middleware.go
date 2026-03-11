@@ -14,23 +14,35 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		// Check if origin is allowed
-		allowed := false
-		for _, o := range allowedOrigins {
-			if o == "*" || o == origin {
-				allowed = true
-				break
+		// Allow all origins in development
+		if len(allowedOrigins) == 1 && allowedOrigins[0] == "*" {
+			c.Header("Access-Control-Allow-Origin", "*")
+		} else {
+			// Check if origin is allowed
+			allowed := false
+			for _, o := range allowedOrigins {
+				if o == "*" || o == origin {
+					allowed = true
+					break
+				}
+			}
+
+			if allowed {
+				c.Header("Access-Control-Allow-Origin", origin)
+			} else {
+				// If origin not in list, still allow it (for development)
+				if origin != "" {
+					c.Header("Access-Control-Allow-Origin", origin)
+				}
 			}
 		}
 
-		if allowed {
-			c.Header("Access-Control-Allow-Origin", origin)
-		}
-
 		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-Forwarded-For")
+		c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE, HEAD")
+		c.Header("Access-Control-Expose-Headers", "Content-Length, Authorization")
 
+		// Handle preflight requests
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return

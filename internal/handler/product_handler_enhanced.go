@@ -3,6 +3,7 @@ package handler
 import (
 	"ecommerce/internal/domain/model"
 	"ecommerce/internal/service"
+	"ecommerce/pkg/pagination"
 	"ecommerce/pkg/response"
 	"net/http"
 	"strconv"
@@ -285,23 +286,39 @@ func (h *ProductHandlerEnhanced) GetProduct(c *gin.Context) {
 // @Success 200 {object} response.PaginatedResponse
 // @Router /api/products [get]
 func (h *ProductHandlerEnhanced) GetProducts(c *gin.Context) {
+	// Parse pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
+	// Validate pagination parameters
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	// Get products with pagination
 	products, total, err := h.productService.GetProducts(page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get products"))
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Paginated(gin.H{
-		"products": products,
-	}, total, page, limit, ""))
+	// Create pagination result
+	paginationResult := pagination.NewResult(page, limit, total)
+
+	c.JSON(http.StatusOK, response.PaginatedResponse{
+		Success: true,
+		Data:    products,
+		Pagination: paginationResult,
+		Message: "Products retrieved successfully",
+	})
 }
 
 // SearchProducts handles product search
 // @Summary Search products
-// @Description Search products with filters
+// @Description Search products with filters and pagination
 // @Tags products
 // @Produce json
 // @Param keyword query string false "Search keyword"
@@ -314,60 +331,82 @@ func (h *ProductHandlerEnhanced) GetProducts(c *gin.Context) {
 // @Success 200 {object} response.PaginatedResponse
 // @Router /api/products/search [get]
 func (h *ProductHandlerEnhanced) SearchProducts(c *gin.Context) {
-	var req ProductFiltersRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.BadRequest(err.Error()))
-		return
-	}
+	// Parse pagination parameters
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
-	if req.Page < 1 {
-		req.Page = 1
+	// Validate pagination parameters
+	if page < 1 {
+		page = 1
 	}
-	if req.Limit < 1 || req.Limit > 100 {
-		req.Limit = 20
+	if limit < 1 || limit > 100 {
+		limit = 20
 	}
 
 	keyword := c.Query("keyword")
 
-	// Build filters
-	filters := service.ProductFilters{
-		SortBy:    req.SortBy,
-		SortOrder: req.SortOrder,
+	// Parse optional filters
+	var filters service.ProductFilters
+	filters.SortBy = c.DefaultQuery("sort_by", "created_at")
+	filters.SortOrder = c.DefaultQuery("sort_order", "desc")
+
+	if categoryID := c.Query("category_id"); categoryID != "" {
+		if id, err := strconv.ParseUint(categoryID, 10, 32); err == nil {
+			catID := uint(id)
+			filters.CategoryID = &catID
+		}
 	}
 
-	if req.CategoryID > 0 {
-		filters.CategoryID = &req.CategoryID
-	}
-	if req.ShopID > 0 {
-		filters.ShopID = &req.ShopID
-	}
-	if req.MinPrice > 0 {
-		filters.MinPrice = &req.MinPrice
-	}
-	if req.MaxPrice > 0 {
-		filters.MaxPrice = &req.MaxPrice
-	}
-	if req.MinRating > 0 {
-		filters.MinRating = &req.MinRating
-	}
-	if req.Brands != "" {
-		filters.Brands = strings.Split(req.Brands, ",")
+	if shopID := c.Query("shop_id"); shopID != "" {
+		if id, err := strconv.ParseUint(shopID, 10, 32); err == nil {
+			sID := uint(id)
+			filters.ShopID = &sID
+		}
 	}
 
-	products, total, err := h.productService.SearchProducts(keyword, filters, req.Page, req.Limit)
+	if minPrice := c.Query("min_price"); minPrice != "" {
+		if price, err := strconv.ParseFloat(minPrice, 64); err == nil {
+			filters.MinPrice = &price
+		}
+	}
+
+	if maxPrice := c.Query("max_price"); maxPrice != "" {
+		if price, err := strconv.ParseFloat(maxPrice, 64); err == nil {
+			filters.MaxPrice = &price
+		}
+	}
+
+	if minRating := c.Query("min_rating"); minRating != "" {
+		if rating, err := strconv.ParseFloat(minRating, 64); err == nil {
+			filters.MinRating = &rating
+		}
+	}
+
+	if brands := c.Query("brands"); brands != "" {
+		filters.Brands = strings.Split(brands, ",")
+	}
+
+	// Search products
+	products, total, err := h.productService.SearchProducts(keyword, filters, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to search products"))
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Paginated(gin.H{
-		"products": products,
-	}, total, req.Page, req.Limit, ""))
+	// Create pagination result
+	paginationResult := pagination.NewResult(page, limit, total)
+
+	c.JSON(http.StatusOK, response.PaginatedResponse{
+		Success: true,
+		Data:    products,
+		Pagination: paginationResult,
+		Message: "Products search completed successfully",
+	})
 }
 
 // GetProductsByCategory handles getting products by category
 // @Summary Get products by category
-// @Description Get products in a category
+// @Description Get products in a category with pagination
 // @Tags products
 // @Produce json
 // @Param id path int true "Category ID"
@@ -382,18 +421,34 @@ func (h *ProductHandlerEnhanced) GetProductsByCategory(c *gin.Context) {
 		return
 	}
 
+	// Parse pagination parameters
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
+	// Validate pagination parameters
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	// Get products by category
 	products, total, err := h.productService.GetProductsByCategoryID(uint(id), page, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get products"))
+		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get products by category"))
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Paginated(gin.H{
-		"products": products,
-	}, total, page, limit, ""))
+	// Create pagination result
+	paginationResult := pagination.NewResult(page, limit, total)
+
+	c.JSON(http.StatusOK, response.PaginatedResponse{
+		Success: true,
+		Data:    products,
+		Pagination: paginationResult,
+		Message: "Products retrieved successfully",
+	})
 }
 
 // GetBestSellers handles getting best selling products

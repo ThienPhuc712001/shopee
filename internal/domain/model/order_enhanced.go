@@ -47,6 +47,12 @@ type Order struct {
 	PaymentStatus       PaymentStatus   `gorm:"type:varchar(20);not null;default:'pending';index" json:"payment_status"`
 	FulfillmentStatus   FulfillmentStatus `gorm:"type:varchar(20);default:'unfulfilled'" json:"fulfillment_status"`
 
+	// Coupon
+	CouponID            *uint           `gorm:"type:int;index" json:"coupon_id"`
+	Coupon              *Coupon         `gorm:"foreignKey:CouponID" json:"coupon,omitempty"`
+	CouponCode          string          `gorm:"type:varchar(50)" json:"coupon_code"`
+	CouponDiscount      float64         `gorm:"type:decimal(18,2);default:0" json:"coupon_discount"`
+
 	// Pricing
 	Subtotal            float64         `gorm:"type:decimal(18,2);not null" json:"subtotal"`
 	ShippingFee         float64         `gorm:"type:decimal(18,2);default:0" json:"shipping_fee"`
@@ -250,6 +256,7 @@ type OrderInput struct {
 	ShippingInfo     ShippingInfo `json:"shipping_info" binding:"required"`
 	PaymentMethod    string       `json:"payment_method" binding:"required"`
 	BuyerNote        string       `json:"buyer_note"`
+	CouponCode       string       `json:"coupon_code"`
 	VoucherCode      string       `json:"voucher_code"`
 	ShippingMethod   string       `json:"shipping_method"`
 	EstimatedDelivery *time.Time  `json:"estimated_delivery"`

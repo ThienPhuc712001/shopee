@@ -42,6 +42,35 @@ type Category struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// CategoryWithCount includes product count for display
+type CategoryWithCount struct {
+	Category
+	ProductCount int64 `json:"product_count"`
+}
+
+// CategoryTree represents a category with its full hierarchy
+type CategoryTree struct {
+	ID           uint           `json:"id"`
+	ParentID     *uint          `json:"parent_id"`
+	Name         string         `json:"name"`
+	Slug         string         `json:"slug"`
+	Description  string         `json:"description"`
+	IconURL      string         `json:"icon_url"`
+	ImageURL     string         `json:"image_url"`
+	Level        int            `json:"level"`
+	SortOrder    int            `json:"sort_order"`
+	IsActive     bool           `json:"is_active"`
+	ProductCount int64          `json:"product_count"`
+	Children     []CategoryTree `json:"children"`
+}
+
+// CategoryBreadcrumb represents a category in a breadcrumb trail
+type CategoryBreadcrumb struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
 // Product represents a product in the system
 type Product struct {
 	ID                uint          `gorm:"type:int;primaryKey;autoIncrement" json:"id"`

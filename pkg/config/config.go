@@ -17,6 +17,7 @@ type Config struct {
 	Security SecurityConfig
 	RateLimit RateLimitConfig
 	CORS     CORSConfig
+	Email    EmailConfig
 }
 
 // AppConfig holds application-level configuration
@@ -56,6 +57,17 @@ type CORSConfig struct {
 	AllowedOrigins []string
 }
 
+// EmailConfig holds email/SMTP configuration
+type EmailConfig struct {
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	FromName  string
+	FromEmail string
+	UseTLS    bool
+}
+
 // Load reads configuration from environment variables
 func Load() *Config {
 	// Load .env file (ignore error if not present in production)
@@ -86,6 +98,15 @@ func Load() *Config {
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: parseOrigins(getEnv("CORS_ALLOWED_ORIGINS", "*")),
+		},
+		Email: EmailConfig{
+			Host:      getEnv("EMAIL_HOST", "smtp.gmail.com"),
+			Port:      parseInt(getEnv("EMAIL_PORT", "587")),
+			Username:  getEnv("EMAIL_USERNAME", ""),
+			Password:  getEnv("EMAIL_PASSWORD", ""),
+			FromName:  getEnv("EMAIL_FROM_NAME", "E-Commerce Store"),
+			FromEmail: getEnv("EMAIL_FROM_EMAIL", "noreply@example.com"),
+			UseTLS:    getEnv("EMAIL_USE_TLS", "true") == "true",
 		},
 	}
 

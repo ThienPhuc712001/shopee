@@ -8,6 +8,8 @@ import (
 	"ecommerce/internal/service"
 	"ecommerce/pkg/config"
 	"ecommerce/pkg/database"
+	"ecommerce/pkg/email"
+	"ecommerce/pkg/logger"
 	"ecommerce/pkg/middleware"
 	"context"
 	"log"
@@ -20,9 +22,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var appLog *logger.Logger
+
 func main() {
 	// Load configuration
 	cfg := config.Load()
+
+	// Initialize logger
+	var err error
+	appLog, err = logger.New(logger.DefaultConfig())
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
 
 	// Setup Gin mode based on environment
 	setupGinMode(cfg.App.Env)
@@ -48,6 +59,10 @@ func main() {
 	orderRepo := repository.NewOrderRepositoryEnhanced(db)
 	_ = repository.NewShopRepositoryEnhanced(db)
 	paymentRepo := repository.NewPaymentRepositoryEnhanced(db)
+	imageRepo := repository.NewImageRepository(db)
+	categoryRepo := repository.NewCategoryRepository(db)
+	inventoryRepo := repository.NewInventoryRepository(db)
+	couponRepo := repository.NewCouponRepository(db)
 
 	// Initialize token service with separate secrets for access and refresh tokens
 	tokenService := service.NewTokenService(service.TokenServiceConfig{
@@ -57,18 +72,56 @@ func main() {
 		RefreshExpiry: 24 * time.Hour,
 	})
 
-	// Initialize services
-	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, 15*time.Minute)
+	// Initialize repositories
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+
+	// Initialize auth service with new constructor
+	authService := service.NewAuthService(service.AuthServiceConfig{
+		DB:               db,
+		UserRepo:         userRepo,
+		RefreshTokenRepo: refreshTokenRepo,
+		TokenService:     tokenService,
+		Log:              appLog,
+		MaxLoginAttempts: 5,
+		LockoutDuration:  15 * time.Minute,
+	})
 	productService := service.NewProductServiceEnhanced(productRepo)
 	cartService := service.NewCartServiceEnhanced(cartRepo, productRepo)
-	orderService := service.NewOrderServiceEnhanced(orderRepo, cartRepo, productRepo)
+	
+	// Initialize email service
+	emailConfig := model.EmailConfig{
+		Host:      cfg.Email.Host,
+		Port:      cfg.Email.Port,
+		Username:  cfg.Email.Username,
+		Password:  cfg.Email.Password,
+		FromName:  cfg.Email.FromName,
+		FromEmail: cfg.Email.FromEmail,
+		UseTLS:    cfg.Email.UseTLS,
+	}
+	emailService := email.NewEmailService(emailConfig)
+	
+	couponService := service.NewCouponService(couponRepo)
+	notificationRepo := repository.NewNotificationRepository(db)
+	notificationService := service.NewNotificationService(notificationRepo, emailService, userRepo)
+	orderService := service.NewOrderServiceEnhanced(orderRepo, cartRepo, productRepo, couponRepo, couponService, notificationService)
 	paymentService := service.NewPaymentServiceEnhanced(paymentRepo, orderRepo)
+	uploadService := service.NewUploadService(imageRepo, "./uploads")
+	categoryService := service.NewCategoryService(categoryRepo)
+	inventoryService := service.NewInventoryService(inventoryRepo)
+	shippingRepo := repository.NewShippingRepository(db)
+	shippingService := service.NewShippingService(shippingRepo)
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, appLog)
 	productHandler := handler.NewProductHandlerEnhanced(productService)
 	cartHandler := handler.NewCartHandlerEnhanced(cartService)
 	orderHandler := handler.NewOrderHandlerEnhanced(orderService)
+	uploadHandler := handler.NewUploadHandler(uploadService)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+	inventoryHandler := handler.NewInventoryHandler(inventoryService)
+	couponHandler := handler.NewCouponHandler(couponService)
+	shippingHandler := handler.NewShippingHandler(shippingService)
+	notificationHandler := handler.NewNotificationHandler(notificationService)
 	_ = handler.NewPaymentHandlerEnhanced(paymentService)
 
 	// Setup router with enhanced authentication
@@ -80,6 +133,31 @@ func main() {
 		tokenService,
 		cfg.CORS.AllowedOrigins,
 	)
+
+	// Setup upload routes
+	apiRoutes := router.Group("/api")
+	routes.SetupUploadRoutes(apiRoutes, uploadHandler, tokenService)
+
+	// Setup category routes
+	routes.SetupCategoryRoutes(apiRoutes, categoryHandler, tokenService)
+
+	// Setup product routes (search is included)
+	routes.SetupProductRoutes(apiRoutes, productHandler, tokenService)
+
+	// Setup inventory routes
+	routes.SetupInventoryRoutes(apiRoutes, inventoryHandler, tokenService)
+
+	// Setup coupon routes
+	routes.SetupCouponRoutes(apiRoutes, couponHandler, tokenService)
+
+	// Setup shipping routes
+	routes.SetupShippingRoutes(apiRoutes, shippingHandler, tokenService)
+
+	// Setup notification routes
+	routes.SetupNotificationRoutes(apiRoutes, notificationHandler, tokenService)
+
+	// Setup static file serving for uploaded images
+	routes.SetupStaticRoutes(router, "./uploads")
 
 	// Initialize rate limiter
 	rateLimiter := middleware.NewRateLimiter(cfg.RateLimit.Requests, cfg.RateLimit.Requests*2)
@@ -105,6 +183,24 @@ func main() {
 		log.Printf("║  Port:           http://localhost:%s                   ║", cfg.App.Port)
 		log.Printf("║  Environment:    %s                                    ║", cfg.App.Env)
 		log.Printf("║  Health Check:   /health                               ║")
+		log.Printf("╠════════════════════════════════════════════════════════╣")
+		log.Printf("║  Product Search Endpoints:                             ║")
+		log.Printf("║    GET  /api/products/search                           ║")
+		log.Printf("║    GET  /api/products/featured                         ║")
+		log.Printf("║    GET  /api/products/best-sellers                     ║")
+		log.Printf("╠════════════════════════════════════════════════════════╣")
+		log.Printf("║  Category Endpoints:                                   ║")
+		log.Printf("║    GET  /api/categories                                ║")
+		log.Printf("║    GET  /api/categories/tree                           ║")
+		log.Printf("║    GET  /api/categories/:id/products                   ║")
+		log.Printf("║    POST /api/categories (Admin)                        ║")
+		log.Printf("╠════════════════════════════════════════════════════════╣")
+		log.Printf("║  Image Upload Endpoints:                               ║")
+		log.Printf("║    POST /api/upload/product                            ║")
+		log.Printf("║    POST /api/upload/product/multiple                   ║")
+		log.Printf("║    POST /api/upload/review                             ║")
+		log.Printf("║    POST /api/upload/avatar                             ║")
+		log.Printf("║    GET  /uploads/{filename}                            ║")
 		log.Printf("╠════════════════════════════════════════════════════════╣")
 		log.Printf("║  Authentication Endpoints:                             ║")
 		log.Printf("║    POST /api/auth/register                             ║")
@@ -156,6 +252,26 @@ func runMigrations() error {
 		&model.OrderItem{},
 		&model.Payment{},
 		&model.Review{},
+		// Image upload tables
+		&model.ReviewImage{},
+		&model.UserAvatar{},
+		&model.ImageUploadLog{},
+		// Inventory tables
+		&model.Inventory{},
+		&model.InventoryLog{},
+		&model.StockAlert{},
+		// Coupon tables
+		&model.Coupon{},
+		&model.CouponUsage{},
+		// Shipping tables
+		&model.ShippingAddress{},
+		&model.Shipment{},
+		&model.ShipmentTracking{},
+		&model.ShippingCarrier{},
+		// Notification tables
+		&model.Notification{},
+		&model.NotificationPreference{},
+		&model.NotificationLog{},
 	}
 
 	return database.AutoMigrate(models...)
