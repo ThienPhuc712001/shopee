@@ -18,6 +18,12 @@ func SetupShippingRoutes(
 	{
 		// Get active carriers
 		public.GET("/shipping/carriers", shippingHandler.GetActiveCarriers)
+
+		// Get shipping methods
+		public.GET("/shipping/methods", shippingHandler.GetShippingMethods)
+		
+		// Calculate shipping cost
+		public.POST("/shipping/calculate", shippingHandler.CalculateShipping)
 	}
 
 	// User routes (require authentication)

@@ -58,6 +58,9 @@ type AdminServiceEnhanced interface {
 	GetAuditLogs(page, limit int) ([]model.AuditLog, int64, error)
 	GetAuditLogsByAdminID(adminID uint, page, limit int) ([]model.AuditLog, int64, error)
 	CreateAuditLog(input *model.AuditLogInput) error
+
+	// Review Management
+	GetAllReviews(page, limit int) ([]model.Review, int64, error)
 }
 
 type adminServiceEnhanced struct {
@@ -601,4 +604,20 @@ func (s *adminServiceEnhanced) CreateAuditLog(input *model.AuditLogInput) error 
 	}
 
 	return s.adminRepo.CreateAuditLog(log)
+}
+
+// GetAllReviews retrieves all reviews for moderation
+func (s *adminServiceEnhanced) GetAllReviews(page, limit int) ([]model.Review, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	// Get reviews from repository
+	// Note: This assumes the adminRepo has a method to get all reviews
+	// If not, we'll need to add it or use a different repository
+	return s.adminRepo.GetAllReviews(limit, offset)
 }

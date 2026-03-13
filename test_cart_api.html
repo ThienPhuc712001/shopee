@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Cart API</title>
+</head>
+<body>
+    <h1>Test Cart Functionality</h1>
+    
+    <button onclick="testLogin()">1. Test Login</button>
+    <div id="login-result"></div>
+    
+    <button onclick="testAddToCart()">2. Test Add to Cart</button>
+    <div id="cart-result"></div>
+    
+    <button onclick="testGetCart()">3. Test Get Cart</button>
+    <div id="get-cart-result"></div>
+
+    <script>
+        let token = '';
+        
+        async function testLogin() {
+            try {
+                const res = await fetch('http://localhost:8080/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'customer@example.com', password: 'customer123' })
+                });
+                const data = await res.json();
+                document.getElementById('login-result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                if (data.data && data.data.access_token) {
+                    token = data.data.access_token;
+                    alert('Login successful! Token saved.');
+                }
+            } catch (err) {
+                document.getElementById('login-result').innerHTML = '<pre style="color:red">' + err.message + '</pre>';
+            }
+        }
+        
+        async function testAddToCart() {
+            if (!token) {
+                alert('Please login first!');
+                return;
+            }
+            try {
+                const res = await fetch('http://localhost:8080/api/cart/add', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ product_id: 1, quantity: 1 })
+                });
+                const data = await res.json();
+                document.getElementById('cart-result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('cart-result').innerHTML = '<pre style="color:red">' + err.message + '</pre>';
+            }
+        }
+        
+        async function testGetCart() {
+            if (!token) {
+                alert('Please login first!');
+                return;
+            }
+            try {
+                const res = await fetch('http://localhost:8080/api/cart', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+                document.getElementById('get-cart-result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('get-cart-result').innerHTML = '<pre style="color:red">' + err.message + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>

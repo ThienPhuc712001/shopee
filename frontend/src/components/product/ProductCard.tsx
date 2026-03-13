@@ -1,149 +1,118 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { StarIcon, ShoppingCartIcon } from '@heroicons/react/24/solid';
-import { StarIcon as StarOutlineIcon } from '@heroicons/react/24/outline';
-import type { Product } from '../../types';
-import { ROUTES } from '../../constants';
+import { Link } from 'react-router-dom'
+import { ShoppingCart, Heart, Star, Eye } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Product } from '../../types'
 
 interface ProductCardProps {
-  product: Product;
-  onAddToCart?: (productId: number) => void;
+  product: Product
+  onAddToCart?: (product: Product) => void
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
-  const {
-    id,
-    name,
-    slug,
-    price,
-    original_price,
-    discount_percent,
-    images,
-    rating_avg,
-    rating_count,
-    sold_count,
-    stock,
-    is_flash_sale,
-    flash_sale_price,
-  } = product;
-
-  const primaryImage = images?.find((img) => img.is_primary) || images?.[0];
-  const displayPrice = is_flash_sale && flash_sale_price ? flash_sale_price : price;
-  const discount = discount_percent > 0 ? discount_percent : original_price > price 
-    ? Math.round(((original_price - price) / original_price) * 100) 
-    : 0;
-  const isOutOfStock = stock <= 0;
-
-  const renderStars = (rating: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        i <= Math.floor(rating) ? (
-          <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
-        ) : (
-          <StarOutlineIcon key={i} className="w-4 h-4 text-yellow-400" />
-        )
-      );
-    }
-    return stars;
-  };
+function ProductCard({ product, onAddToCart }: ProductCardProps) {
+  const discount = product.original_price
+    ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
+    : 0
 
   const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (onAddToCart && !isOutOfStock) {
-      onAddToCart(id);
+    e.preventDefault()
+    e.stopPropagation()
+    if (onAddToCart) {
+      onAddToCart(product)
     }
-  };
+  }
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 group">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group card"
+      whileHover={{ y: -5, scale: 1.02 }}
+    >
       {/* Image */}
-      <Link to={ROUTES.PRODUCT_DETAIL.replace(':id', id.toString())} className="block relative">
-        <div className="aspect-square overflow-hidden bg-gray-100">
-          {primaryImage ? (
-            <img
-              src={primaryImage.url}
-              alt={name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              No Image
+      <div className="relative overflow-hidden aspect-square bg-gradient-to-br from-gray-100 to-gray-200">
+        {product.images && product.images.length > 0 && product.images[0].url ? (
+          <img
+            src={product.images[0].url}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect fill="%23f3f4f6" width="300" height="300"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="18" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle"%3EProduct Image%3C/text%3E%3C/svg%3E'
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400">
+            <div className="text-center">
+              <div className="text-6xl mb-2">📦</div>
+              <p className="text-sm font-medium">No Image</p>
             </div>
-          )}
-        </div>
-
-        {/* Badges */}
-        <div className="absolute top-2 left-2 flex flex-col space-y-1">
-          {is_flash_sale && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
-              FLASH SALE
-            </span>
-          )}
-          {discount > 0 && (
-            <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded">
-              -{discount}%
-            </span>
-          )}
-          {isOutOfStock && (
-            <span className="bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded">
-              OUT OF STOCK
-            </span>
-          )}
-        </div>
-
-        {/* Quick add to cart button */}
-        {!isOutOfStock && (
-          <button
-            onClick={handleAddToCart}
-            className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-primary-600 hover:text-white"
-          >
-            <ShoppingCartIcon className="w-5 h-5" />
-          </button>
+          </div>
         )}
-      </Link>
+        
+        {/* Discount Badge */}
+        {discount > 0 && (
+          <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-bold">
+            -{discount}%
+          </span>
+        )}
 
-      {/* Content */}
+        {/* Quick Actions */}
+        <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-primary-500 hover:text-white transition">
+            <Heart className="w-5 h-5" />
+          </button>
+          <button className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-primary-500 hover:text-white transition">
+            <Eye className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Add to Cart Button */}
+        <button 
+          onClick={handleAddToCart}
+          className="absolute bottom-0 left-0 right-0 bg-primary-500 text-white py-3 font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 hover:bg-primary-600"
+        >
+          <ShoppingCart className="w-5 h-5" />
+          Add to Cart
+        </button>
+      </div>
+
+      {/* Product Info */}
       <div className="p-4">
-        <Link to={ROUTES.PRODUCT_DETAIL.replace(':id', id.toString())}>
-          <h3 className="font-medium text-gray-800 line-clamp-2 hover:text-primary-600 transition-colors mb-2">
-            {name}
+        <Link to={`/products/${product.id}`}>
+          <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-500 transition">
+            {product.name}
           </h3>
         </Link>
 
         {/* Rating */}
-        {rating_count > 0 && (
-          <div className="flex items-center space-x-1 mb-2">
-            <div className="flex">{renderStars(rating_avg)}</div>
-            <span className="text-sm text-gray-500">({rating_count})</span>
+        {product.rating && (
+          <div className="flex items-center gap-1 mb-2">
+            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+            <span className="text-sm text-gray-600">{product.rating}</span>
+            <span className="text-sm text-gray-400">({product.review_count} reviews)</span>
           </div>
         )}
 
         {/* Price */}
-        <div className="flex items-center space-x-2 mb-2">
-          <span className="text-lg font-bold text-primary-600">
-            ${displayPrice.toFixed(2)}
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-bold text-primary-500">
+            ${product.price.toFixed(2)}
           </span>
-          {original_price > displayPrice && (
-            <span className="text-sm text-gray-400 line-through">
-              ${original_price.toFixed(2)}
+          {product.original_price && (
+            <span className="text-gray-400 line-through">
+              ${product.original_price.toFixed(2)}
             </span>
           )}
         </div>
 
-        {/* Sold count */}
-        {sold_count > 0 && (
-          <p className="text-sm text-gray-500">{sold_count.toLocaleString()} sold</p>
-        )}
-
-        {/* Stock indicator */}
-        {!isOutOfStock && stock < 10 && (
-          <p className="text-sm text-orange-500 font-medium">Only {stock} left!</p>
-        )}
+        {/* Stock Status */}
+        {product.stock === 0 ? (
+          <p className="text-red-500 text-sm font-medium mt-2">Out of Stock</p>
+        ) : product.stock < 10 ? (
+          <p className="text-orange-500 text-sm font-medium mt-2">Only {product.stock} left</p>
+        ) : null}
       </div>
-    </div>
-  );
-};
+    </motion.div>
+  )
+}
 
-export default ProductCard;
+export default ProductCard

@@ -608,3 +608,100 @@ func (h *ShippingHandler) GetActiveCarriers(c *gin.Context) {
 		},
 	})
 }
+
+// GetShippingMethods handles GET /api/shipping/methods
+func (h *ShippingHandler) GetShippingMethods(c *gin.Context) {
+	// Return available shipping methods
+	methods := []gin.H{
+		{
+			"id":          "standard",
+			"name":        "Standard Shipping",
+			"description": "5-7 business days",
+			"base_price":  30000,
+			"estimated_days": 7,
+		},
+		{
+			"id":          "express",
+			"name":        "Express Shipping",
+			"description": "2-3 business days",
+			"base_price":  50000,
+			"estimated_days": 3,
+		},
+		{
+			"id":          "overnight",
+			"name":        "Overnight Shipping",
+			"description": "Next business day",
+			"base_price":  100000,
+			"estimated_days": 1,
+		},
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"methods": methods,
+			"count":   len(methods),
+		},
+	})
+}
+
+// CalculateShipping handles POST /api/shipping/calculate
+func (h *ShippingHandler) CalculateShipping(c *gin.Context) {
+	var req struct {
+		FromCity    string  `json:"from_city" binding:"required"`
+		ToCity      string  `json:"to_city" binding:"required"`
+		Weight      float64 `json:"weight" binding:"required,gt=0"`
+		ShippingMethod string `json:"shipping_method" binding:"required"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Invalid input",
+			"error":   err.Error(),
+		})
+		return
+	}
+	
+	// Calculate shipping cost based on method
+	var basePrice float64
+	var estimatedDays int
+	
+	switch req.ShippingMethod {
+	case "standard":
+		basePrice = 30000
+		estimatedDays = 7
+	case "express":
+		basePrice = 50000
+		estimatedDays = 3
+	case "overnight":
+		basePrice = 100000
+		estimatedDays = 1
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Invalid shipping method",
+		})
+		return
+	}
+	
+	// Calculate total cost (base price + weight factor)
+	weightFactor := req.Weight * 5000 // 5000 VND per kg
+	totalCost := basePrice + weightFactor
+	
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"from_city":       req.FromCity,
+			"to_city":         req.ToCity,
+			"weight":          req.Weight,
+			"shipping_method": req.ShippingMethod,
+			"base_price":      basePrice,
+			"weight_charge":   weightFactor,
+			"total_cost":      totalCost,
+			"estimated_days":  estimatedDays,
+			"currency":        "VND",
+		},
+		"message": "Shipping cost calculated successfully",
+	})
+}

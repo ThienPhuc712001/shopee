@@ -48,6 +48,9 @@ type AdminRepositoryEnhanced interface {
 	GetPublicSystemSettings() ([]model.SystemSetting, error)
 	UpdateSystemSetting(key string, value string, updatedBy *uint) error
 	CreateSystemSetting(setting *model.SystemSetting) error
+
+	// Review Management
+	GetAllReviews(limit, offset int) ([]model.Review, int64, error)
 	DeleteSystemSetting(key string) error
 
 	// Refunds
@@ -516,3 +519,24 @@ var (
 	ErrDuplicateEmail   = errors.New("email already exists")
 	ErrInvalidRole      = errors.New("invalid admin role")
 )
+
+// ==================== REVIEW MANAGEMENT ====================
+
+func (r *adminRepositoryEnhanced) GetAllReviews(limit, offset int) ([]model.Review, int64, error) {
+	var reviews []model.Review
+	var total int64
+
+	// Get total count
+	r.db.Model(&model.Review{}).Count(&total)
+
+	// Get reviews with pagination
+	err := r.db.Model(&model.Review{}).
+		Preload("User").
+		Preload("Product").
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&reviews).Error
+
+	return reviews, total, err
+}

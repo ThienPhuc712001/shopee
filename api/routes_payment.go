@@ -14,28 +14,31 @@ func SetupPaymentRoutes(
 	tokenService service.TokenService,
 ) {
 	// Public routes (no auth required for webhook)
-	rg.POST("/webhook", paymentHandler.WebhookHandler)
+	public := rg.Group("")
+	{
+		public.POST("/payments/webhook", paymentHandler.WebhookHandler)
+	}
 
 	// Protected routes (auth required)
 	protected := rg.Group("")
 	protected.Use(middleware.JWTAuth(tokenService))
 	{
 		// Payment creation and retrieval
-		protected.POST("/create", paymentHandler.CreatePayment)
-		protected.POST("/confirm", paymentHandler.ConfirmPayment)
-		protected.GET("/order/:order_id", paymentHandler.GetPaymentByOrderID)
-		protected.GET("", paymentHandler.GetUserPayments)
+		protected.POST("/payments/create", paymentHandler.CreatePayment)
+		protected.POST("/payments/confirm", paymentHandler.ConfirmPayment)
+		protected.GET("/payments/order/:order_id", paymentHandler.GetPaymentByOrderID)
+		protected.GET("/payments", paymentHandler.GetUserPayments)
 
 		// Refunds
-		protected.POST("/refund", paymentHandler.RequestRefund)
+		protected.POST("/payments/refund", paymentHandler.RequestRefund)
 
 		// Payment methods
-		protected.POST("/methods", paymentHandler.SavePaymentMethod)
-		protected.GET("/methods", paymentHandler.GetPaymentMethods)
-		protected.DELETE("/methods/:id", paymentHandler.DeletePaymentMethod)
-		protected.POST("/methods/:id/default", paymentHandler.SetDefaultPaymentMethod)
+		protected.POST("/payments/methods", paymentHandler.SavePaymentMethod)
+		protected.GET("/payments/methods", paymentHandler.GetPaymentMethods)
+		protected.DELETE("/payments/methods/:id", paymentHandler.DeletePaymentMethod)
+		protected.POST("/payments/methods/:id/default", paymentHandler.SetDefaultPaymentMethod)
 
 		// Statistics
-		protected.GET("/statistics", paymentHandler.GetPaymentStats)
+		protected.GET("/payments/statistics", paymentHandler.GetPaymentStats)
 	}
 }

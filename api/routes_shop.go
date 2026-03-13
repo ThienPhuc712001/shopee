@@ -14,10 +14,14 @@ func SetupShopRoutes(
 	shopHandler *handler.ShopHandler,
 	tokenService service.TokenService,
 ) {
-	// Public routes
-	public := rg.Group("/shops")
+	// Public routes - register parameterized routes LAST to avoid conflicts
+	public := rg.Group("")
 	{
-		public.GET("/:id", shopHandler.GetShop)
+		// List all shops - use /shops-list to avoid conflict with /shops/:id
+		public.GET("/shops-list", shopHandler.GetShops)
+		
+		// Parameterized route MUST be last
+		public.GET("/shops/:id", shopHandler.GetShop)
 	}
 
 	// Protected routes (auth required)
@@ -27,5 +31,6 @@ func SetupShopRoutes(
 		// Shop management routes
 		protected.POST("/shops", shopHandler.CreateShop)
 		protected.GET("/shops/my", shopHandler.GetMyShop)
+		protected.GET("/shops/seller/me", shopHandler.GetShopsBySeller)
 	}
 }

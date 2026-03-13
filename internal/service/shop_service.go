@@ -14,6 +14,8 @@ type ShopService interface {
 	CreateShop(userID uint, input *CreateShopInput) (*model.Shop, error)
 	GetShopByID(id uint) (*model.Shop, error)
 	GetShopByUserID(userID uint) (*model.Shop, error)
+	GetAllShops(limit, offset int) ([]model.Shop, int64, error)
+	GetShopsByUserID(userID uint) ([]model.Shop, error)
 	UpdateShop(id uint, input *UpdateShopInput) (*model.Shop, error)
 }
 
@@ -82,6 +84,31 @@ func (s *shopService) GetShopByID(id uint) (*model.Shop, error) {
 
 func (s *shopService) GetShopByUserID(userID uint) (*model.Shop, error) {
 	return s.repo.FindByUserID(userID)
+}
+
+func (s *shopService) GetAllShops(limit, offset int) ([]model.Shop, int64, error) {
+	return s.repo.FindAll(limit, offset)
+}
+
+func (s *shopService) GetShopsByUserID(userID uint) ([]model.Shop, error) {
+	shops, _, err := s.repo.FindAll(100, 0)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Filter shops by user ID
+	var userShops []model.Shop
+	for _, shop := range shops {
+		if shop.UserID == userID {
+			userShops = append(userShops, shop)
+		}
+	}
+	
+	if len(userShops) == 0 {
+		return nil, errors.New("no shops found for user")
+	}
+	
+	return userShops, nil
 }
 
 func (s *shopService) UpdateShop(id uint, input *UpdateShopInput) (*model.Shop, error) {

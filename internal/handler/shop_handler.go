@@ -117,3 +117,68 @@ func (h *ShopHandler) GetMyShop(c *gin.Context) {
 		"shop": shop,
 	}, "Shop retrieved successfully"))
 }
+
+// GetShops handles getting all shops
+// @Summary Get all shops
+// @Description Get a list of all shops
+// @Tags shops
+// @Produce json
+// @Param limit query int false "Limit" default(20)
+// @Param offset query int false "Offset" default(0)
+// @Success 200 {object} response.Response
+// @Router /api/shops [get]
+func (h *ShopHandler) GetShops(c *gin.Context) {
+	limit := 20
+	offset := 0
+
+	shops, total, err := h.shopService.GetAllShops(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Failed to retrieve shops",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"shops": shops,
+			"total": total,
+		},
+		"message": "Shops retrieved successfully",
+	})
+}
+
+// GetShopsBySeller handles getting shops by seller ID
+// @Summary Get shops by seller
+// @Description Get all shops owned by the authenticated user
+// @Tags shops
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response
+// @Router /api/shops/seller/me [get]
+func (h *ShopHandler) GetShopsBySeller(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, response.Unauthorized("User not authenticated"))
+		return
+	}
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusBadRequest, response.BadRequest("Invalid user ID"))
+		return
+	}
+
+	shops, err := h.shopService.GetShopsByUserID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, response.NotFound("No shops found"))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(gin.H{
+		"shops": shops,
+	}, "Shops retrieved successfully"))
+}

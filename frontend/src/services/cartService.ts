@@ -1,58 +1,29 @@
-import apiClient from './api';
-import type { Cart } from '../types';
+import apiClient from './api'
+import { ApiResponse, Cart, CartItem } from '../types'
 
 export const cartService = {
-  // Get cart
-  async getCart(): Promise<Cart> {
-    const response = await apiClient.get<Cart>('/cart');
-    return response.data;
+  getCart: async (): Promise<Cart> => {
+    const response = await apiClient.get<ApiResponse<Cart>>('/cart')
+    return response.data.data!
   },
 
-  // Add item to cart
-  async addItem(productId: number, quantity: number, variantId?: number): Promise<Cart> {
-    const response = await apiClient.post<Cart>('/cart/items', {
-      product_id: productId,
-      quantity,
-      variant_id: variantId,
-    });
-    return response.data;
+  addToCart: async (product_id: number, quantity: number): Promise<Cart> => {
+    const response = await apiClient.post<ApiResponse<Cart>>('/cart/add', { product_id, quantity })
+    return response.data.data!
   },
 
-  // Update cart item quantity
-  async updateItem(itemId: number, quantity: number): Promise<Cart> {
-    const response = await apiClient.put<Cart>(`/cart/items/${itemId}`, { quantity });
-    return response.data;
+  updateCartItem: async (itemId: number, quantity: number): Promise<Cart> => {
+    const response = await apiClient.put<ApiResponse<Cart>>(`/cart/items/${itemId}`, { quantity })
+    return response.data.data!
   },
 
-  // Remove item from cart
-  async removeItem(itemId: number): Promise<Cart> {
-    const response = await apiClient.delete<Cart>(`/cart/items/${itemId}`);
-    return response.data;
+  removeFromCart: async (itemId: number): Promise<void> => {
+    await apiClient.delete(`/cart/items/${itemId}`)
   },
 
-  // Clear cart
-  async clearCart(): Promise<Cart> {
-    const response = await apiClient.delete<Cart>('/cart/clear');
-    return response.data;
+  clearCart: async (): Promise<void> => {
+    await apiClient.delete('/cart/clear')
   },
+}
 
-  // Apply discount code
-  async applyDiscount(code: string): Promise<Cart> {
-    const response = await apiClient.post<Cart>('/cart/discount', { code });
-    return response.data;
-  },
-
-  // Remove discount
-  async removeDiscount(): Promise<Cart> {
-    const response = await apiClient.delete<Cart>('/cart/discount');
-    return response.data;
-  },
-
-  // Get cart item count
-  async getItemCount(): Promise<number> {
-    const cart = await this.getCart();
-    return cart.total_items;
-  },
-};
-
-export default cartService;
+export default cartService

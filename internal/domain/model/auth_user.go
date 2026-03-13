@@ -33,7 +33,7 @@ type User struct {
 	Password        string     `gorm:"type:varchar(255);not null" json:"-"`
 	FirstName       string     `gorm:"type:varchar(100)" json:"first_name"`
 	LastName        string     `gorm:"type:varchar(100)" json:"last_name"`
-	Phone           string     `gorm:"type:varchar(20);uniqueIndex" json:"phone"`
+	Phone           string     `gorm:"type:varchar(20);index" json:"phone"`
 	Avatar          string     `gorm:"type:varchar(500)" json:"avatar"`
 	Role            UserRole   `gorm:"type:varchar(20);default:'customer';index" json:"role"`
 	Status          UserStatus `gorm:"type:varchar(20);default:'active';index" json:"status"`

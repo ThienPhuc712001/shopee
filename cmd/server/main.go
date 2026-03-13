@@ -131,8 +131,8 @@ func main() {
 	couponHandler := handler.NewCouponHandler(couponService)
 	shippingHandler := handler.NewShippingHandler(shippingService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
-	_ = handler.NewPaymentHandlerEnhanced(paymentService)
-	
+	paymentHandler := handler.NewPaymentHandlerEnhanced(paymentService)
+
 	// Initialize admin service and handler
 	adminService := service.NewAdminServiceEnhanced(adminRepo, userRepo, shopRepo, productRepo, orderRepo)
 	adminHandler := handler.NewAdminHandlerEnhanced(adminService)
@@ -147,8 +147,10 @@ func main() {
 		cfg.CORS.AllowedOrigins,
 	)
 
-	// Setup upload routes
+	// Setup API routes group - Register ALL routes here BEFORE server starts
 	apiRoutes := router.Group("/api")
+
+	// Setup upload routes
 	routes.SetupUploadRoutes(apiRoutes, uploadHandler, tokenService)
 
 	// Setup category routes
@@ -171,6 +173,9 @@ func main() {
 
 	// Setup notification routes
 	routes.SetupNotificationRoutes(apiRoutes, notificationHandler, tokenService)
+
+	// Setup payment routes
+	routes.SetupPaymentRoutes(apiRoutes, paymentHandler, tokenService)
 
 	// Setup admin routes
 	routes.SetupAdminRoutes(apiRoutes.Group("/admin"), adminHandler, tokenService)

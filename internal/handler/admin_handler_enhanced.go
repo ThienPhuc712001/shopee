@@ -470,3 +470,28 @@ type RefundOrderRequest struct {
 type UpdateSettingRequest struct {
 	Value string `json:"value" binding:"required"`
 }
+
+// GetAllReviews handles getting all reviews
+// @Summary Get all reviews
+// @Description Get all reviews for moderation (Admin only)
+// @Tags admin/reviews
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number"
+// @Param limit query int false "Items per page"
+// @Success 200 {object} response.PaginatedResponse
+// @Router /api/admin/reviews [get]
+func (h *AdminHandlerEnhanced) GetAllReviews(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	reviews, total, err := h.adminService.GetAllReviews(page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.InternalError("Failed to get reviews"))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Paginated(gin.H{
+		"reviews": reviews,
+	}, total, page, limit, ""))
+}

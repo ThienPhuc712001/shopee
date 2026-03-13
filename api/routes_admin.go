@@ -43,6 +43,9 @@ func SetupAdminRoutes(
 			adminOnly.GET("/orders", adminHandler.GetOrders)
 			adminOnly.POST("/orders/refund", adminHandler.RefundOrder)
 
+			// Review Management
+			adminOnly.GET("/reviews", adminHandler.GetAllReviews)
+
 			// Analytics
 			adminOnly.GET("/analytics/stats", adminHandler.GetAdminStats)
 			adminOnly.GET("/analytics/sales", adminHandler.GetSalesAnalytics)

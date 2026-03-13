@@ -1,98 +1,29 @@
-import apiClient from './api';
-import type { AuthResponse, LoginInput, RegisterInput, User } from '../types';
+import apiClient from './api'
+import { ApiResponse, AuthResponse, LoginRequest, RegisterRequest, User } from '../types'
 
 export const authService = {
-  // Login
-  async login(data: LoginInput): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/auth/login', data);
-    if (response.success) {
-      // Store tokens
-      localStorage.setItem('access_token', response.data.token);
-      localStorage.setItem('refresh_token', response.data.refresh_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
-    return response.data;
+  login: async (data: LoginRequest): Promise<AuthResponse> => {
+    const response = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', data)
+    return response.data.data!
   },
 
-  // Register
-  async register(data: RegisterInput): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/auth/register', data);
-    if (response.success) {
-      localStorage.setItem('access_token', response.data.token);
-      localStorage.setItem('refresh_token', response.data.refresh_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
-    return response.data;
+  register: async (data: RegisterRequest): Promise<AuthResponse> => {
+    const response = await apiClient.post<ApiResponse<AuthResponse>>('/auth/register', data)
+    return response.data.data!
   },
 
-  // Logout
-  async logout(): Promise<void> {
-    try {
-      await apiClient.post('/auth/logout');
-    } finally {
-      this.clearAuth();
-    }
+  logout: async (): Promise<void> => {
+    await apiClient.post('/auth/logout')
   },
 
-  // Refresh token
-  async refreshToken(): Promise<AuthResponse> {
-    const refreshToken = localStorage.getItem('refresh_token');
-    const response = await apiClient.post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken });
-    if (response.success) {
-      localStorage.setItem('access_token', response.data.token);
-      localStorage.setItem('refresh_token', response.data.refresh_token);
-    }
-    return response.data;
+  getCurrentUser: async (): Promise<User> => {
+    const response = await apiClient.get<ApiResponse<User>>('/auth/me')
+    return response.data.data!
   },
 
-  // Get current user
-  async getCurrentUser(): Promise<User> {
-    const response = await apiClient.get<User>('/auth/me');
-    return response.data;
+  forgotPassword: async (email: string): Promise<void> => {
+    await apiClient.post('/auth/forgot-password', { email })
   },
+}
 
-  // Update profile
-  async updateProfile(data: Partial<User>): Promise<User> {
-    const response = await apiClient.put<User>('/auth/profile', data);
-    if (response.success) {
-      localStorage.setItem('user', JSON.stringify(response.data));
-    }
-    return response.data;
-  },
-
-  // Change password
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await apiClient.put('/auth/change-password', {
-      current_password: currentPassword,
-      new_password: newPassword,
-    });
-  },
-
-  // Clear auth data
-  clearAuth(): void {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    apiClient.clearAuthTokens();
-  },
-
-  // Get stored user
-  getStoredUser(): User | null {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        return JSON.parse(userStr);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  },
-
-  // Check if authenticated
-  isAuthenticated(): boolean {
-    return !!localStorage.getItem('access_token');
-  },
-};
-
-export default authService;
+export default authService

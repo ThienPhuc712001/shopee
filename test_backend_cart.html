@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Backend Cart API</title>
+</head>
+<body>
+    <h1>Test Backend Cart API Directly</h1>
+    <p>Open browser console (F12) to see results</p>
+    
+    <button onclick="testHealth()">Test Health</button>
+    <button onclick="testLogin()">Test Login</button>
+    <button onclick="testCart()">Test Cart (need login first)</button>
+    
+    <script>
+        let token = '';
+        
+        async function testHealth() {
+            try {
+                const res = await fetch('http://localhost:8080/health');
+                const data = await res.json();
+                console.log('✅ Health:', data);
+                alert('Health: ' + JSON.stringify(data));
+            } catch (err) {
+                console.error('❌ Health:', err);
+                alert('Health check failed: ' + err.message);
+            }
+        }
+        
+        async function testLogin() {
+            try {
+                const res = await fetch('http://localhost:8080/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'customer@example.com', password: 'customer123' })
+                });
+                const data = await res.json();
+                console.log('✅ Login response:', data);
+                
+                if (data.data && data.data.access_token) {
+                    token = data.data.access_token;
+                    console.log('✅ Token saved:', token.substring(0, 50) + '...');
+                    alert('Login successful! Token saved.');
+                } else {
+                    alert('Login failed: ' + (data.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('❌ Login:', err);
+                alert('Login failed: ' + err.message);
+            }
+        }
+        
+        async function testCart() {
+            if (!token) {
+                alert('Please login first!');
+                return;
+            }
+            
+            try {
+                // Test GET /api/cart
+                console.log('Testing GET /api/cart...');
+                const getRes = await fetch('http://localhost:8080/api/cart', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const getData = await getRes.json();
+                console.log('✅ GET /api/cart:', getData);
+                
+                // Test POST /api/cart/add
+                console.log('Testing POST /api/cart/add...');
+                const postRes = await fetch('http://localhost:8080/api/cart/add', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ product_id: 1, quantity: 1 })
+                });
+                const postData = await postRes.json();
+                console.log('✅ POST /api/cart/add:', postData);
+                
+                alert('Cart API test complete! Check console for details.');
+            } catch (err) {
+                console.error('❌ Cart:', err);
+                alert('Cart API test failed: ' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
